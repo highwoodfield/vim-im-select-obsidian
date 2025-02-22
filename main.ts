@@ -31,6 +31,7 @@ interface VimImPluginSettings {
 	windowsDefaultIM: string;
 	windowsObtainCmd: string;
 	windowsSwitchCmd: string;
+	switchOnInsert: boolean
 }
 
 const DEFAULT_SETTINGS: VimImPluginSettings = {
@@ -40,6 +41,7 @@ const DEFAULT_SETTINGS: VimImPluginSettings = {
 	windowsDefaultIM: '',
 	windowsObtainCmd: '',
 	windowsSwitchCmd: '',
+	switchOnInsert: true,
 }
 
 function isEmpty(obj : any) {
@@ -62,6 +64,7 @@ export default class VimImPlugin extends Plugin {
 			if (view) {
 				const editor = this.getCodeMirror(view);
 				if (editor) {
+					// TODO: suppress error
 					editor.off('vim-mode-change', this.onVimModeChanged);
 					editor.on('vim-mode-change', this.onVimModeChanged);
 				}
@@ -110,8 +113,6 @@ export default class VimImPlugin extends Plugin {
 				console.debug(`switch im: ${switchToInsert}`);
 			});
 		}
-
-		this.previousMode = "insert"
 	}
 
 	async switchToNormal() {
@@ -143,8 +144,6 @@ export default class VimImPlugin extends Plugin {
 				console.debug(`switch im: ${switchFromInsert}`);
 			});
 		}
-
-		this.previousMode = "normal"
 	}
 
 	onVimModeChanged = async (modeObj: any) => {
@@ -153,7 +152,9 @@ export default class VimImPlugin extends Plugin {
 		}
 		switch (modeObj.mode) {
 			case "insert":
-				this.switchToInsert();
+				if (this.settings.switchOnInsert) {
+					this.switchToInsert();
+				}
 				break;
 			default:
 				if (this.previousMode != "insert") {
@@ -162,6 +163,7 @@ export default class VimImPlugin extends Plugin {
 				this.switchToNormal();
 				break;
 		}
+		this.previousMode = modeObj.mode;
 	};
 
 	onunload() {
@@ -193,6 +195,14 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.createEl('h2', { text: 'Vim IM Select Settings.' });
 
+		new Setting(containerEl)
+			.setName("Switch IME mode on insert")
+			.addToggle(text => text
+				.setValue(this.plugin.settings.switchOnInsert)
+				.onChange(async (value) => {
+					this.plugin.settings.switchOnInsert = value;
+					await this.plugin.saveSettings();
+				}));
 		containerEl.createEl('h3', { text: 'Settings for default platform.' });
 		new Setting(containerEl)
 			.setName('Default IM')
