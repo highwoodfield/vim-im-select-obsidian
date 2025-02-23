@@ -1,5 +1,11 @@
 # Obsidian Vim IM Select Plugin
 
+NOTE: This is a fork.  
+The features which are added in this fork are:
+- Switching IME mode to normal when you open another note.
+- Switching IME mode to normal when you focus on the window of Obsidian. (option)
+- Keeping IME mode to normal when you change Vim mode to insert. (option)
+
 [Chinese ver. 中文版本](./README_zh.md)
 
 This plugin is used to automatically switch the current input method of the system when `vim key binding` is used in Obsidian, to prevent non-English input method from causing key binding failure in `vim normal` mode.
