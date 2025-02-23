@@ -21,7 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-import { App, Plugin, PluginSettingTab, Setting, MarkdownView } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, MarkdownView, Notice } from 'obsidian';
 
 import * as os from 'os';
 interface VimImPluginSettings {
@@ -110,12 +110,17 @@ export default class VimImPlugin extends Plugin {
 		if (typeof switchToInsert != 'undefined' && switchToInsert) {
 			exec(switchToInsert, (error: any, stdout: any, stderr: any) => {
 				if (error) {
-					console.error(`switch error: ${error}`);
+					this.showError(`switch error: ${error}`);
 					return;
 				}
 				console.debug(`switch im: ${switchToInsert}`);
 			});
 		}
+	}
+
+	showError(msg: string) {
+		console.error(msg);
+		new Notice("Error: " + msg);
 	}
 
 	async switchToNormal() {
@@ -130,7 +135,7 @@ export default class VimImPlugin extends Plugin {
 		if (typeof obtainc != 'undefined' && obtainc) {
 			exec(obtainc, (error: any, stdout: any, stderr: any) => {
 				if (error) {
-					console.error(`obtain error: ${error}`);
+					this.showError(`Failed to execute a command to obtain current Vim mode. (${error})`);
 					return;
 				}
 				this.currentInsertIM = stdout;
@@ -141,7 +146,7 @@ export default class VimImPlugin extends Plugin {
 		if (typeof switchFromInsert != 'undefined' && switchFromInsert) {
 			exec(switchFromInsert, (error: any, stdout: any, stderr: any) => {
 				if (error) {
-					console.error(`switch error: ${error}`);
+					this.showError(`Failed to execute a command to switch Vim mode. (${error})`);
 					return;
 				}
 				console.debug(`switch im: ${switchFromInsert}`);
