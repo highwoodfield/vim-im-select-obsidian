@@ -79,7 +79,7 @@ export default class VimImPlugin extends Plugin {
 		}));
 		
 		this.registerEvent(this.app.workspace.on('file-open', async () => {
-			await this.onSwitchFromInsert();
+			await this.switchToNormalIME();
 		}));
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
@@ -98,7 +98,7 @@ export default class VimImPlugin extends Plugin {
 			this.registerDomEvent(window, "focus", () => {
 				// console.debug("focus evt");
 				if (this.previousVimMode !== "insert") {
-					this.onSwitchFromInsert();
+					this.switchToNormalIME();
 				}
 			});
 		}
@@ -117,14 +117,18 @@ export default class VimImPlugin extends Plugin {
 		if (!this.settings.switchOnInsert) {
 			return;
 		}
+		await this.switchToPreviousIME();
+	}
+
+	async switchToPreviousIME() {
 		if (this.previousIMEMode === null) {
 			return;
 		}
 
 		const switchCmd = this.isWinPlatform
-			? this.settings.windowsSwitchCmd.replace(/{im}/, this.previousIMEMode) 
+			? this.settings.windowsSwitchCmd.replace(/{im}/, this.previousIMEMode)
 			: this.settings.switchCmd.replace(/{im}/, this.previousIMEMode);
-		
+
 		try {
 			await exec(switchCmd);
 		} catch (err) {
@@ -137,7 +141,7 @@ export default class VimImPlugin extends Plugin {
 		new Notice("Error: " + msg + ` (${err})`);
 	}
 
-	async onSwitchFromInsert() {
+	async switchToNormalIME() {
 		const switchCmd = this.isWinPlatform 
 			? this.settings.windowsSwitchCmd.replace(/{im}/, this.settings.windowsDefaultIM) 
 			: this.settings.switchCmd.replace(/{im}/, this.settings.defaultIM);
@@ -164,7 +168,8 @@ export default class VimImPlugin extends Plugin {
 				break;
 			default:
 				if (this.previousVimMode == "insert") {
-					this.onSwitchFromInsert();
+					// When Vim mode is from INSERT to another
+					this.switchToNormalIME();
 					break;
 				}
 				break;
