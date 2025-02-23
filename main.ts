@@ -55,7 +55,7 @@ function isEmpty(obj : any) {
 
 export default class VimImPlugin extends Plugin {
 	settings: VimImPluginSettings;
-	private previousIMEMode = '';
+	private previousIMEMode: string | null = null;
 	private previousVimMode = '';
 	private isWinPlatform = false;
 
@@ -104,18 +104,18 @@ export default class VimImPlugin extends Plugin {
 
 	async onSwitchToInsert() {
 		if (!this.settings.switchOnInsert) {
-			return
+			return;
+		}
+		if (this.previousIMEMode === null) {
+			return;
 		}
 
-		let switchToInsert: string;
-		if (this.previousIMEMode) {
-			switchToInsert = this.isWinPlatform
-				? this.settings.windowsSwitchCmd.replace(/{im}/, this.previousIMEMode) 
-				: this.settings.switchCmd.replace(/{im}/, this.previousIMEMode);
-		}
-
+		const switchCmd = this.isWinPlatform
+			? this.settings.windowsSwitchCmd.replace(/{im}/, this.previousIMEMode) 
+			: this.settings.switchCmd.replace(/{im}/, this.previousIMEMode);
+		
 		try {
-			await exec(switchToInsert);
+			await exec(switchCmd);
 		} catch (err) {
 			this.showError("An error has occurred while switching IME mode", err);
 		}
@@ -127,7 +127,7 @@ export default class VimImPlugin extends Plugin {
 	}
 
 	async onSwitchFromInsert() {
-		const switchFromInsertCmd = this.isWinPlatform 
+		const switchCmd = this.isWinPlatform 
 			? this.settings.windowsSwitchCmd.replace(/{im}/, this.settings.windowsDefaultIM) 
 			: this.settings.switchCmd.replace(/{im}/, this.settings.defaultIM);
 		const obtainCmd = this.isWinPlatform 
@@ -137,7 +137,7 @@ export default class VimImPlugin extends Plugin {
 		try {
 			this.previousIMEMode = (await exec(obtainCmd)).stdout;
 			console.debug(`Current IME mode: ${this.previousIMEMode}`);
-			await exec(switchFromInsertCmd);
+			await exec(switchCmd);
 		} catch (err) {
 			this.showError("An error occcurred while switching IME mode", err);
 		}
