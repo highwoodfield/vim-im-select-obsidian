@@ -24,6 +24,11 @@ SOFTWARE.
 import { App, Plugin, PluginSettingTab, Setting, MarkdownView, Notice } from 'obsidian';
 
 import * as os from 'os';
+import * as child_process from 'child_process';
+import * as util from 'util';
+
+const exec = util.promisify(child_process.exec)
+
 interface VimImPluginSettings {
 	defaultIM: string;
 	obtainCmd: string;
@@ -98,7 +103,6 @@ export default class VimImPlugin extends Plugin {
 	}
 
 	async switchToInsert() {
-		const { exec } = require('child_process');
 		let switchToInsert: string;
 		if (this.currentInsertIM) {
 			switchToInsert = this.isWinPlatform ?
@@ -106,51 +110,31 @@ export default class VimImPlugin extends Plugin {
 				this.settings.switchCmd.replace(/{im}/, this.currentInsertIM);
 		}
 
-		console.debug("change to insert");
-		if (typeof switchToInsert != 'undefined' && switchToInsert) {
-			exec(switchToInsert, (error: any, stdout: any, stderr: any) => {
-				if (error) {
-					this.showError(`switch error: ${error}`);
-					return;
-				}
-				console.debug(`switch im: ${switchToInsert}`);
-			});
+		try {
+			await exec(switchToInsert);
+		} catch (err) {
+			this.showError("An error has occurred while switching IME mode", err);
 		}
 	}
 
-	showError(msg: string) {
-		console.error(msg);
-		new Notice("Error: " + msg);
+	showError(msg: string, err: any) {
+		console.error(msg, err);
+		new Notice("Error: " + msg + ` (${err})`);
 	}
 
 	async switchToNormal() {
-		const { exec } = require('child_process');
 		const switchFromInsert = this.isWinPlatform ?
 			this.settings.windowsSwitchCmd.replace(/{im}/, this.settings.windowsDefaultIM) :
 			this.settings.switchCmd.replace(/{im}/, this.settings.defaultIM);
 		const obtainc = this.isWinPlatform ?
 			this.settings.windowsObtainCmd : this.settings.obtainCmd;
 		console.debug("change to noInsert");
-		//[0]: Obtian im in Insert Mode
-		if (typeof obtainc != 'undefined' && obtainc) {
-			exec(obtainc, (error: any, stdout: any, stderr: any) => {
-				if (error) {
-					this.showError(`Failed to execute a command to obtain current Vim mode. (${error})`);
-					return;
-				}
-				this.currentInsertIM = stdout;
-				console.debug(`obtain im: ${this.currentInsertIM}`);
-			});
-		}
-		//[1]: Switch to default im
-		if (typeof switchFromInsert != 'undefined' && switchFromInsert) {
-			exec(switchFromInsert, (error: any, stdout: any, stderr: any) => {
-				if (error) {
-					this.showError(`Failed to execute a command to switch Vim mode. (${error})`);
-					return;
-				}
-				console.debug(`switch im: ${switchFromInsert}`);
-			});
+		try {
+			this.currentInsertIM = (await exec(obtainc)).stdout;
+			console.debug(`Current IME mode: ${this.currentInsertIM}`);
+			await exec(switchFromInsert);
+		} catch (err) {
+			this.showError("An error occcurred while switching IME mode", err);
 		}
 	}
 
