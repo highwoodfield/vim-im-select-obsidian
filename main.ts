@@ -36,7 +36,8 @@ interface VimImPluginSettings {
 	windowsDefaultIM: string;
 	windowsObtainCmd: string;
 	windowsSwitchCmd: string;
-	switchOnInsert: boolean
+	switchOnInsert: boolean;
+	normalModeOnFocus: boolean;
 }
 
 const DEFAULT_SETTINGS: VimImPluginSettings = {
@@ -47,6 +48,7 @@ const DEFAULT_SETTINGS: VimImPluginSettings = {
 	windowsObtainCmd: '',
 	windowsSwitchCmd: '',
 	switchOnInsert: true,
+	normalModeOnFocus: false,
 }
 
 function isEmpty(obj : any) {
@@ -90,6 +92,15 @@ export default class VimImPlugin extends Plugin {
 
 		if (this.isWinPlatform) {
 			console.info("VimIm Use Windows config");
+		}
+
+		if (this.settings.normalModeOnFocus) {
+			this.registerDomEvent(window, "focus", () => {
+				// console.debug("focus evt");
+				if (this.previousVimMode !== "insert") {
+					this.onSwitchFromInsert();
+				}
+			});
 		}
 	}
 
@@ -196,6 +207,15 @@ class SampleSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.switchOnInsert)
 				.onChange(async (value) => {
 					this.plugin.settings.switchOnInsert = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName("Switch Vim mode to normal on window focus")
+			.setDesc("You have to reload/restart Obsidian to take effect")
+			.addToggle(text => text
+				.setValue(this.plugin.settings.normalModeOnFocus)
+				.onChange(async (value) => {
+					this.plugin.settings.normalModeOnFocus = value;
 					await this.plugin.saveSettings();
 				}));
 		containerEl.createEl('h3', { text: 'Settings for default platform.' });
