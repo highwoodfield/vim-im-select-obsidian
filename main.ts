@@ -109,9 +109,9 @@ export default class VimImPlugin extends Plugin {
 
 		let switchToInsert: string;
 		if (this.previousIMEMode) {
-			switchToInsert = this.isWinPlatform ?
-				this.settings.windowsSwitchCmd.replace(/{im}/, this.previousIMEMode) :
-				this.settings.switchCmd.replace(/{im}/, this.previousIMEMode);
+			switchToInsert = this.isWinPlatform
+				? this.settings.windowsSwitchCmd.replace(/{im}/, this.previousIMEMode) 
+				: this.settings.switchCmd.replace(/{im}/, this.previousIMEMode);
 		}
 
 		try {
@@ -127,11 +127,12 @@ export default class VimImPlugin extends Plugin {
 	}
 
 	async onSwitchFromInsert() {
-		const switchFromInsertCmd = this.isWinPlatform ?
-			this.settings.windowsSwitchCmd.replace(/{im}/, this.settings.windowsDefaultIM) :
-			this.settings.switchCmd.replace(/{im}/, this.settings.defaultIM);
-		const obtainCmd = this.isWinPlatform ?
-			this.settings.windowsObtainCmd : this.settings.obtainCmd;
+		const switchFromInsertCmd = this.isWinPlatform 
+			? this.settings.windowsSwitchCmd.replace(/{im}/, this.settings.windowsDefaultIM) 
+			: this.settings.switchCmd.replace(/{im}/, this.settings.defaultIM);
+		const obtainCmd = this.isWinPlatform 
+			? this.settings.windowsObtainCmd 
+			: this.settings.obtainCmd;
 		console.debug("change to noInsert");
 		try {
 			this.previousIMEMode = (await exec(obtainCmd)).stdout;
