@@ -70,7 +70,10 @@ export default class VimImPlugin extends Plugin {
 				}
 			}
 		}));
-
+		
+		this.registerEvent(this.app.workspace.on('file-open', async () => {
+			await this.switchToNormal();
+		}));
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
