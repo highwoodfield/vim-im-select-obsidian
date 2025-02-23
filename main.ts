@@ -103,6 +103,10 @@ export default class VimImPlugin extends Plugin {
 	}
 
 	async onSwitchToInsert() {
+		if (!this.settings.switchOnInsert) {
+			return
+		}
+
 		let switchToInsert: string;
 		if (this.previousIMEMode) {
 			switchToInsert = this.isWinPlatform ?
@@ -144,15 +148,13 @@ export default class VimImPlugin extends Plugin {
 		}
 		switch (modeObj.mode) {
 			case "insert":
-				if (this.settings.switchOnInsert) {
-					this.onSwitchToInsert();
-				}
+				this.onSwitchToInsert();
 				break;
 			default:
-				if (this.previousVimMode != "insert") {
+				if (this.previousVimMode == "insert") {
+					this.onSwitchFromInsert();
 					break;
 				}
-				this.onSwitchFromInsert();
 				break;
 		}
 		this.previousVimMode = modeObj.mode;
