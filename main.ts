@@ -59,7 +59,7 @@ export default class VimImPlugin extends Plugin {
 
 		// when open a file, to initialize current
 		// editor type CodeMirror5 or CodeMirror6
-		this.app.workspace.on('active-leaf-change', async () => {
+		this.registerEvent(this.app.workspace.on('active-leaf-change', async () => {
 			const view = this.getActiveView();
 			if (view) {
 				const editor = this.getCodeMirror(view);
@@ -69,7 +69,7 @@ export default class VimImPlugin extends Plugin {
 					editor.on('vim-mode-change', this.onVimModeChanged);
 				}
 			}
-		});
+		}));
 
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
