@@ -29,25 +29,29 @@ import * as util from 'util';
 
 const exec = util.promisify(child_process.exec)
 
+const INSERTION_MODE_PREVIOUS = "_PREVIOUS_";
+
 interface VimImPluginSettings {
 	defaultIM: string;
+	insertionIM: string;
 	obtainCmd: string;
 	switchCmd: string;
 	windowsDefaultIM: string;
+	windowsInsertionIM: string;
 	windowsObtainCmd: string;
 	windowsSwitchCmd: string;
-	switchOnInsert: boolean;
 	normalModeOnFocus: boolean;
 }
 
 const DEFAULT_SETTINGS: VimImPluginSettings = {
 	defaultIM: '',
+	insertionIM: INSERTION_MODE_PREVIOUS,
 	obtainCmd: '',
 	switchCmd: '',
 	windowsDefaultIM: '',
+	windowsInsertionIM: INSERTION_MODE_PREVIOUS,
 	windowsObtainCmd: '',
 	windowsSwitchCmd: '',
-	switchOnInsert: true,
 	normalModeOnFocus: false,
 }
 
@@ -114,29 +118,26 @@ export default class VimImPlugin extends Plugin {
 	}
 
 	async onSwitchToInsert() {
-		if (!this.settings.switchOnInsert) {
+		let mode = this.isWinPlatform ? this.settings.windowsInsertionIM : this.settings.insertionIM;
+		if (mode === INSERTION_MODE_PREVIOUS) {
+			mode = this.previousIMEMode;
+		}
+		if (mode === null) {
 			return;
 		}
-		await this.switchToPreviousIME();
+		await this.execSwitch(mode);
 	}
 
 	async execSwitch(im: string) {
 		let cmd = this.isWinPlatform
 			? this.settings.windowsSwitchCmd
 			: this.settings.switchCmd;
-		cmd = cmd.replace("/{im}/", im);
+		cmd = cmd.replace(/{im}/, im);
 		try {
 			await exec(cmd);
 		} catch (err) {
 			this.showError("An error has occurred while switching IME mode", err);
 		}
-	}
-
-	async switchToPreviousIME() {
-		if (this.previousIMEMode === null) {
-			return;
-		}
-		await this.execSwitch(this.previousIMEMode);
 	}
 
 	showError(msg: string, err: any) {
@@ -162,12 +163,12 @@ export default class VimImPlugin extends Plugin {
 		}
 		switch (modeObj.mode) {
 			case "insert":
-				this.onSwitchToInsert();
+				await this.onSwitchToInsert();
 				break;
 			default:
 				if (this.previousVimMode == "insert") {
 					// When Vim mode is from INSERT to another
-					this.switchToNormalIME();
+					await this.switchToNormalIME();
 					break;
 				}
 				break;
@@ -205,14 +206,6 @@ class SampleSettingTab extends PluginSettingTab {
 		containerEl.createEl('h2', { text: 'Vim IM Select Settings.' });
 
 		new Setting(containerEl)
-			.setName("Switch IME mode on insert")
-			.addToggle(text => text
-				.setValue(this.plugin.settings.switchOnInsert)
-				.onChange(async (value) => {
-					this.plugin.settings.switchOnInsert = value;
-					await this.plugin.saveSettings();
-				}));
-		new Setting(containerEl)
 			.setName("Switch Vim mode to normal on window focus")
 			.setDesc("You have to reload/restart Obsidian to take effect")
 			.addToggle(text => text
@@ -222,6 +215,14 @@ class SampleSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 		containerEl.createEl('h3', { text: 'Settings for default platform.' });
+		new Setting(containerEl)
+			.setName("IME mode on insertion. You can set mode to the previous mode by setting this value to " + INSERTION_MODE_PREVIOUS)
+			.addText(text => text
+				.setValue(this.plugin.settings.insertionIM)
+				.onChange(async (value) => {
+					this.plugin.settings.insertionIM = value;
+					await this.plugin.saveSettings();
+				}));
 		new Setting(containerEl)
 			.setName('Default IM')
 			.setDesc('IM for normal mode')
@@ -257,6 +258,14 @@ class SampleSettingTab extends PluginSettingTab {
 				}));
 
 		containerEl.createEl('h3', { text: 'Settings for Windows platform.' });
+		new Setting(containerEl)
+			.setName("IME mode on insertion. You can set mode to the previous mode by setting this value to " + INSERTION_MODE_PREVIOUS)
+			.addText(text => text
+				.setValue(this.plugin.settings.windowsInsertionIM)
+				.onChange(async (value) => {
+					this.plugin.settings.windowsInsertionIM = value;
+					await this.plugin.saveSettings();
+				}));
 		new Setting(containerEl)
 			.setName('Windows Default IM')
 			.setDesc('IM for normal mode')
