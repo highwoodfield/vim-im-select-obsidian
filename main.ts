@@ -83,7 +83,7 @@ export default class VimImPlugin extends Plugin {
 		}));
 		
 		this.registerEvent(this.app.workspace.on('file-open', async () => {
-			await this.switchToNormalIME();
+			await this.onNormal();
 		}));
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
@@ -102,7 +102,7 @@ export default class VimImPlugin extends Plugin {
 			this.registerDomEvent(window, "focus", () => {
 				// console.debug("focus evt");
 				if (this.previousVimMode !== "insert") {
-					this.switchToNormalIME();
+					this.onNormal();
 				}
 			});
 		}
@@ -117,7 +117,7 @@ export default class VimImPlugin extends Plugin {
 		return (view as any).sourceMode?.cmEditor?.cm?.cm;
 	}
 
-	async onSwitchToInsert() {
+	async onInsert() {
 		let mode = this.isWinPlatform ? this.settings.windowsInsertionIM : this.settings.insertionIM;
 		if (mode === INSERTION_MODE_PREVIOUS) {
 			mode = this.previousIMEMode;
@@ -145,7 +145,7 @@ export default class VimImPlugin extends Plugin {
 		new Notice("Error: " + msg + ` (${err})`);
 	}
 
-	async switchToNormalIME() {
+	async onNormal() {
 		const obtainCmd = this.isWinPlatform
 			? this.settings.windowsObtainCmd 
 			: this.settings.obtainCmd;
@@ -163,12 +163,12 @@ export default class VimImPlugin extends Plugin {
 		}
 		switch (modeObj.mode) {
 			case "insert":
-				await this.onSwitchToInsert();
+				await this.onInsert();
 				break;
 			default:
 				if (this.previousVimMode == "insert") {
 					// When Vim mode is from INSERT to another
-					await this.switchToNormalIME();
+					await this.onNormal();
 					break;
 				}
 				break;
