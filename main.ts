@@ -243,7 +243,8 @@ class SampleSettingTab extends PluginSettingTab {
 	private createPlatformSettingView(ps: PlatformSettings) {
 		const { containerEl } = this;
 		new Setting(containerEl)
-			.setName("IME mode on insertion. You can set mode to the previous mode by setting this value to " + INSERTION_MODE_PREVIOUS)
+			.setName("IM on insertion mode")
+			.setDesc("You can set mode to the previous mode by setting this value to " + INSERTION_MODE_PREVIOUS)
 			.addText(text => text
 				.setValue(ps.insertionIM)
 				.onChange(async (value) => {
@@ -251,8 +252,7 @@ class SampleSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 		new Setting(containerEl)
-			.setName('Default IM')
-			.setDesc('IM for normal mode')
+			.setName('IM on normal mode')
 			.addText(text => text
 				.setPlaceholder('Default IM')
 				.setValue(ps.normalIM)
