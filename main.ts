@@ -31,7 +31,23 @@ const exec = util.promisify(child_process.exec)
 
 const INSERTION_MODE_PREVIOUS = "_PREVIOUS_";
 
-interface VimImPluginSettings {
+interface Settings {
+	normalModeOnFocus: boolean;
+	defaultPlatformSettings: PlatformSettings;
+	windowsPlatformSettings: PlatformSettings;
+}
+
+interface PlatformSettings {
+	normalIM: string;
+	insertionIM: string;
+	obtainCmd: string;
+	switchCmd: string;
+}
+
+/**
+ * Settings for (de)serialization
+ */
+interface RawSettings {
 	defaultIM: string;
 	insertionIM: string;
 	obtainCmd: string;
@@ -43,7 +59,7 @@ interface VimImPluginSettings {
 	normalModeOnFocus: boolean;
 }
 
-const DEFAULT_SETTINGS: VimImPluginSettings = {
+const DEFAULT_SETTINGS: RawSettings = {
 	defaultIM: '',
 	insertionIM: INSERTION_MODE_PREVIOUS,
 	obtainCmd: '',
@@ -60,10 +76,14 @@ function isEmpty(obj : any) {
 }
 
 export default class VimImPlugin extends Plugin {
-	settings: VimImPluginSettings;
+	settings: Settings;
 	private previousIMEMode: string | null = null;
 	private previousVimMode = '';
 	private isWinPlatform = false;
+
+	getPlatformSettings(windows: boolean = this.isWinPlatform): PlatformSettings {
+		return windows ? this.settings.windowsPlatformSettings : this.settings.defaultPlatformSettings;
+	}
 
 	async onload() {
 		await this.loadSettings();
@@ -92,7 +112,7 @@ export default class VimImPlugin extends Plugin {
 		// console.debug("VimIm::OS type: " + os.type());
 		this.isWinPlatform = os.type() == 'Windows_NT';
 
-		this.previousIMEMode = this.isWinPlatform ? this.settings.windowsDefaultIM : this.settings.defaultIM;
+		this.previousIMEMode = this.getPlatformSettings().normalIM;
 
 		if (this.isWinPlatform) {
 			console.info("VimIm Use Windows config");
@@ -118,7 +138,7 @@ export default class VimImPlugin extends Plugin {
 	}
 
 	async onInsert() {
-		let mode = this.isWinPlatform ? this.settings.windowsInsertionIM : this.settings.insertionIM;
+		let mode = this.getPlatformSettings().insertionIM;
 		if (mode === INSERTION_MODE_PREVIOUS) {
 			mode = this.previousIMEMode;
 		}
@@ -129,10 +149,7 @@ export default class VimImPlugin extends Plugin {
 	}
 
 	async execSwitch(im: string) {
-		let cmd = this.isWinPlatform
-			? this.settings.windowsSwitchCmd
-			: this.settings.switchCmd;
-		cmd = cmd.replace(/{im}/, im);
+		const cmd = this.getPlatformSettings().switchCmd.replace(/{im}/, im);
 		try {
 			await exec(cmd);
 		} catch (err) {
@@ -146,15 +163,13 @@ export default class VimImPlugin extends Plugin {
 	}
 
 	async onNormal() {
-		const obtainCmd = this.isWinPlatform
-			? this.settings.windowsObtainCmd 
-			: this.settings.obtainCmd;
+		const obtainCmd = this.getPlatformSettings().obtainCmd;
 		try {
 			this.previousIMEMode = (await exec(obtainCmd)).stdout;
 		} catch (err) {
 			this.showError("An error occcurred while switching IME mode", err);
 		}
-		await this.execSwitch(this.isWinPlatform ? this.settings.windowsDefaultIM : this.settings.defaultIM);
+		await this.execSwitch(this.getPlatformSettings().normalIM);
 	}
 
 	onVimModeChanged = async (modeObj: any) => {
@@ -180,12 +195,39 @@ export default class VimImPlugin extends Plugin {
 		console.debug("onunload");
 	}
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	async loadSettings(): Promise<Settings> {
+		const s: RawSettings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		return {
+			normalModeOnFocus: s.normalModeOnFocus,
+			windowsPlatformSettings: {
+					normalIM: s.windowsDefaultIM,
+					insertionIM: s.windowsInsertionIM,
+					obtainCmd: s.windowsObtainCmd,
+					switchCmd: s.windowsSwitchCmd,
+			},
+			defaultPlatformSettings: {
+				normalIM: s.defaultIM,
+				insertionIM: s.insertionIM,
+				obtainCmd: s.obtainCmd,
+				switchCmd: s.switchCmd,
+			}
+		}
 	}
 
 	async saveSettings() {
-		await this.saveData(this.settings);
+		const s = this.settings;
+		const rawSettings: RawSettings = {
+			normalModeOnFocus: s.normalModeOnFocus,
+			defaultIM: s.defaultPlatformSettings.normalIM,
+			insertionIM: s.defaultPlatformSettings.insertionIM,
+			obtainCmd: s.defaultPlatformSettings.obtainCmd,
+			switchCmd: s.defaultPlatformSettings.switchCmd,
+			windowsDefaultIM: s.windowsPlatformSettings.normalIM,
+			windowsInsertionIM: s.windowsPlatformSettings.insertionIM,
+			windowsObtainCmd: s.windowsPlatformSettings.obtainCmd,
+			windowsSwitchCmd: s.windowsPlatformSettings.switchCmd,
+		};
+		await this.saveData(rawSettings);
 	}
 
 }
@@ -196,6 +238,51 @@ class SampleSettingTab extends PluginSettingTab {
 	constructor(app: App, plugin: VimImPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	private createPlatformSettingView(ps: PlatformSettings) {
+		const { containerEl } = this;
+		new Setting(containerEl)
+			.setName("IME mode on insertion. You can set mode to the previous mode by setting this value to " + INSERTION_MODE_PREVIOUS)
+			.addText(text => text
+				.setValue(ps.insertionIM)
+				.onChange(async (value) => {
+					ps.insertionIM = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName('Default IM')
+			.setDesc('IM for normal mode')
+			.addText(text => text
+				.setPlaceholder('Default IM')
+				.setValue(ps.normalIM)
+				.onChange(async (value) => {
+					// console.debug('Default IM: ' + value);
+					ps.normalIM = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName('Obtaining Command')
+			.setDesc('Command for obtaining current IM(must be excutable)')
+			.addText(text => text
+				.setPlaceholder('Obtaining Command')
+				.setValue(ps.obtainCmd)
+				.onChange(async (value) => {
+					// console.debug('Obtain Cmd: ' + value);
+					ps.obtainCmd = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName('Switching Command')
+			.setDesc('Command for switching to specific IM(must be excutable)')
+			.addText(text => text
+				.setPlaceholder('Use {im} as placeholder of IM')
+				.setValue(ps.switchCmd)
+				.onChange(async (value) => {
+					// console.debug('Switch Cmd: ' + value);
+					ps.switchCmd = value;
+					await this.plugin.saveSettings();
+				}));
 	}
 
 	display(): void {
@@ -215,89 +302,8 @@ class SampleSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 		containerEl.createEl('h3', { text: 'Settings for default platform.' });
-		new Setting(containerEl)
-			.setName("IME mode on insertion. You can set mode to the previous mode by setting this value to " + INSERTION_MODE_PREVIOUS)
-			.addText(text => text
-				.setValue(this.plugin.settings.insertionIM)
-				.onChange(async (value) => {
-					this.plugin.settings.insertionIM = value;
-					await this.plugin.saveSettings();
-				}));
-		new Setting(containerEl)
-			.setName('Default IM')
-			.setDesc('IM for normal mode')
-			.addText(text => text
-				.setPlaceholder('Default IM')
-				.setValue(this.plugin.settings.defaultIM)
-				.onChange(async (value) => {
-					// console.debug('Default IM: ' + value);
-					this.plugin.settings.defaultIM = value;
-					await this.plugin.saveSettings();
-				}));
-		new Setting(containerEl)
-			.setName('Obtaining Command')
-			.setDesc('Command for obtaining current IM(must be excutable)')
-			.addText(text => text
-				.setPlaceholder('Obtaining Command')
-				.setValue(this.plugin.settings.obtainCmd)
-				.onChange(async (value) => {
-					// console.debug('Obtain Cmd: ' + value);
-					this.plugin.settings.obtainCmd = value;
-					await this.plugin.saveSettings();
-				}));
-		new Setting(containerEl)
-			.setName('Switching Command')
-			.setDesc('Command for switching to specific IM(must be excutable)')
-			.addText(text => text
-				.setPlaceholder('Use {im} as placeholder of IM')
-				.setValue(this.plugin.settings.switchCmd)
-				.onChange(async (value) => {
-					// console.debug('Switch Cmd: ' + value);
-					this.plugin.settings.switchCmd = value;
-					await this.plugin.saveSettings();
-				}));
-
+		this.createPlatformSettingView(this.plugin.settings.defaultPlatformSettings)
 		containerEl.createEl('h3', { text: 'Settings for Windows platform.' });
-		new Setting(containerEl)
-			.setName("IME mode on insertion. You can set mode to the previous mode by setting this value to " + INSERTION_MODE_PREVIOUS)
-			.addText(text => text
-				.setValue(this.plugin.settings.windowsInsertionIM)
-				.onChange(async (value) => {
-					this.plugin.settings.windowsInsertionIM = value;
-					await this.plugin.saveSettings();
-				}));
-		new Setting(containerEl)
-			.setName('Windows Default IM')
-			.setDesc('IM for normal mode')
-			.addText(text => text
-				.setPlaceholder('Default IM')
-				.setValue(this.plugin.settings.windowsDefaultIM)
-				.onChange(async (value) => {
-					// console.debug('Default IM: ' + value);
-					this.plugin.settings.windowsDefaultIM = value;
-					await this.plugin.saveSettings();
-				}));
-		new Setting(containerEl)
-			.setName('Obtaining Command on Windows')
-			.setDesc('Command for obtaining current IM(must be excutable)')
-			.addText(text => text
-				.setPlaceholder('Obtaining Command')
-				.setValue(this.plugin.settings.windowsObtainCmd)
-				.onChange(async (value) => {
-					// console.debug('Obtain Cmd: ' + value);
-					this.plugin.settings.windowsObtainCmd = value;
-					await this.plugin.saveSettings();
-				}));
-		new Setting(containerEl)
-			.setName('Switching Command on Windows')
-			.setDesc('Command for switching to specific IM(must be excutable)')
-			.addText(text => text
-				.setPlaceholder('Use {im} as placeholder of IM')
-				.setValue(this.plugin.settings.windowsSwitchCmd)
-				.onChange(async (value) => {
-					// console.debug('Switch Cmd: ' + value);
-					this.plugin.settings.windowsSwitchCmd = value;
-					await this.plugin.saveSettings();
-				}));
+		this.createPlatformSettingView(this.plugin.settings.windowsPlatformSettings);
 	}
 }
