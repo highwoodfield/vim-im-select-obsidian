@@ -195,9 +195,9 @@ export default class VimImPlugin extends Plugin {
 		console.debug("onunload");
 	}
 
-	async loadSettings(): Promise<Settings> {
+	async loadSettings() {
 		const s: RawSettings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-		return {
+		this.settings =  {
 			normalModeOnFocus: s.normalModeOnFocus,
 			windowsPlatformSettings: {
 					normalIM: s.windowsDefaultIM,
